@@ -33,6 +33,7 @@ class _QRViewExampleState extends State<QRViewExample> {
   late ConfigHTTP configHTTP;
   var flash = false.obs;
   var isLoading = false.obs;
+  var firstRun = true.obs;
   String baseAPI = "http://123.16.55.174:3000/check/product/";
   String idTmp = "";
   @override
@@ -76,6 +77,7 @@ class _QRViewExampleState extends State<QRViewExample> {
                       if (id != idTmp) {
                         idTmp = id;
                         try {
+                          firstRun.value = false;
                           isLoading.value = true;
 
                           http.Response uriResponse = await http.get(
@@ -83,16 +85,9 @@ class _QRViewExampleState extends State<QRViewExample> {
                           );
                           isLoading.value = false;
                           print(uriResponse.body);
-                          dataModel.value =
-                              DataModel.fromJson(jsonDecode(uriResponse.body));
+                          dataModel.value = DataModel.fromJson(jsonDecode(uriResponse.body));
                         } catch (e) {
-                          Fluttertoast.showToast(
-                              msg: "Không tìm thấy dữ liệu",
-                              toastLength: Toast.LENGTH_SHORT,
-                              gravity: ToastGravity.CENTER,
-                              backgroundColor: Colors.red,
-                              textColor: Colors.white,
-                              fontSize: 16.0);
+                          dataModel.value = null;
                         }
                       }
                     },
@@ -115,8 +110,7 @@ class _QRViewExampleState extends State<QRViewExample> {
                         IconButton(
                           onPressed: () async {
                             await controller?.toggleFlash();
-                            flash.value =
-                                await controller!.getFlashStatus() ?? false;
+                            flash.value = await controller!.getFlashStatus() ?? false;
                           },
                           icon: Obx(
                             () => flash.value
@@ -148,55 +142,68 @@ class _QRViewExampleState extends State<QRViewExample> {
             Expanded(
               flex: 1,
               child: Obx(
-                () => isLoading.value
-                    ? Center(child: CircularProgressIndicator())
-                    : dataModel.value != null
-                        ? Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: SingleChildScrollView(
-                              child: Column(
-                                children: [
-                                  Item(
-                                    nameField: "Mã SP: ",
-                                    data: dataModel.value!.maSp!,
+                () => firstRun.value
+                    ? Center(
+                        child: Text('Quét mã QR'),
+                      )
+                    : isLoading.value
+                        ? Center(child: CircularProgressIndicator())
+                        : dataModel.value != null
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: 8, left: 15, right: 15),
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    children: [
+                                      Item(
+                                        nameField: "Mã SP: ",
+                                        data: dataModel.value!.maSp!,
+                                      ),
+                                      Item(
+                                        nameField: "Tên Khách Hàng: ",
+                                        data: dataModel.value!.tenKh.toString(),
+                                      ),
+                                      Item(
+                                        nameField: "SKU: ",
+                                        data: dataModel.value!.sku!,
+                                      ),
+                                      Item(
+                                        nameField: "Số Lượng: ",
+                                        data: dataModel.value!.soLuong.toString(),
+                                      ),
+                                      Item(
+                                        nameField: "Kich thước: ",
+                                        data: "${dataModel.value!.dai.toString()}x${dataModel.value!.rong.toString()}",
+                                      ),
+                                      Item(
+                                        nameField: "Mã Đơn Hàng: ",
+                                        data: dataModel.value!.maDh.toString(),
+                                      ),
+                                      Item(
+                                        nameField: "Chủng Loại: ",
+                                        data: dataModel.value!.chungLoaiKinh.toString(),
+                                      ),
+                                      Item(
+                                        nameField: "Dạng Gia Công: ",
+                                        data: dataModel.value!.dangGiaCong.toString(),
+                                      ),
+                                      Item(
+                                        nameField: "Ngày Đặt Hàng: ",
+                                        data: dataModel.value!.ngayDatHang!,
+                                        paddingBottom: 0,
+                                      ),
+                                    ],
                                   ),
-                                  Item(
-                                    nameField: "sku: ",
-                                    data: dataModel.value!.sku!,
-                                  ),
-                                  Item(
-                                    nameField: "Số Lượng: ",
-                                    data: dataModel.value!.soLuong.toString(),
-                                  ),
-                                  Item(
-                                    nameField: "Kich thước: ",
-                                    data:
-                                        "${dataModel.value!.dai.toString()}x${dataModel.value!.rong.toString()}",
-                                  ),
-                                  Item(
-                                    nameField: "Mã Đơn Hàng: ",
-                                    data: dataModel.value!.maDh.toString(),
-                                  ),
-                                  Item(
-                                    nameField: "Chủng Loại: ",
-                                    data: dataModel.value!.chungLoaiKinh
-                                        .toString(),
-                                  ),
-                                  Item(
-                                    nameField: "Dạng Gia Công: ",
-                                    data:
-                                        dataModel.value!.dangGiaCong.toString(),
-                                  ),
-                                  Item(
-                                      nameField: "Ngày Đặt Hàng: ",
-                                      data: dataModel.value!.ngayDatHang!),
-                                ],
+                                ),
+                              )
+                            : Center(
+                                child: Text('Không tìm thấy dữ liệu'),
                               ),
-                            ))
-                        : Center(
-                            child: Text('Scan a code'),
-                          ),
               ),
+            ),
+            Text("Cao Trung Nghĩa"),
+            Text("Ứng dụng nhận diện sản phẩm"),
+            SizedBox(
+              height: 5,
             )
           ],
         ),
@@ -205,10 +212,8 @@ class _QRViewExampleState extends State<QRViewExample> {
   }
 
   Widget _buildQrView(BuildContext context, Function(String) callApi) {
-    var scanArea = (MediaQuery.of(context).size.width < 400 ||
-            MediaQuery.of(context).size.height < 400)
-        ? 150.0
-        : 300.0;
+    var scanArea =
+        (MediaQuery.of(context).size.width < 400 || MediaQuery.of(context).size.height < 400) ? 150.0 : 300.0;
 
     void _onQRViewCreated(QRViewController controller) {
       setState(() {
@@ -225,11 +230,7 @@ class _QRViewExampleState extends State<QRViewExample> {
       key: qrKey,
       onQRViewCreated: _onQRViewCreated,
       overlay: QrScannerOverlayShape(
-          borderColor: Colors.red,
-          borderRadius: 10,
-          borderLength: 30,
-          borderWidth: 10,
-          cutOutSize: scanArea),
+          borderColor: Colors.red, borderRadius: 10, borderLength: 30, borderWidth: 10, cutOutSize: scanArea),
       onPermissionSet: (ctrl, p) => _onPermissionSet(context, ctrl, p),
     );
   }
@@ -312,13 +313,14 @@ class _QRViewExampleState extends State<QRViewExample> {
 
 class Item extends StatelessWidget {
   const Item({
-    this.data =
-        "adsfas dfghjj jjjjjjjj jjjj jjjjj jjjj jjj jjjjj jjjjjjj jj jjjjjjj jj",
+    this.data = "",
+    this.paddingBottom = 5,
     required this.nameField,
     Key? key,
   }) : super(key: key);
   final String data;
   final String nameField;
+  final double paddingBottom;
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -328,10 +330,11 @@ class Item extends StatelessWidget {
             Expanded(
               flex: 2,
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     nameField,
-                    style: TextStyle(fontSize: 14),
+                    style: TextStyle(fontSize: 13),
                   ),
                 ],
               ),
@@ -340,13 +343,13 @@ class Item extends StatelessWidget {
               flex: 3,
               child: Text(
                 data,
-                style: TextStyle(fontSize: 14),
+                style: TextStyle(fontSize: 13),
               ),
             ),
           ],
         ),
         Padding(
-          padding: const EdgeInsets.only(bottom: 5, top: 5),
+          padding: EdgeInsets.only(bottom: paddingBottom, top: 5),
           child: Container(
             height: 1,
             color: Colors.grey,
