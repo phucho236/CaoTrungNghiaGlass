@@ -1,7 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
+import 'package:caotrungnghiaglass/data_model.dart';
 import 'package:caotrungnghiaglass/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,13 +27,14 @@ class QRViewExample extends StatefulWidget {
 }
 
 class _QRViewExampleState extends State<QRViewExample> {
-  Barcode? result;
+  Rx<DataModel?> dataModel = Rx<DataModel?>(null);
   QRViewController? controller;
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   late ConfigHTTP configHTTP;
   var flash = false.obs;
   var isLoading = false.obs;
-  String baseAPI = "http://113.176.95.141:3000/check/product/";
+  String baseAPI = "http://123.16.55.174:3000/check/product/";
+  String idTmp = "";
   @override
   void reassemble() {
     super.reassemble();
@@ -64,14 +68,35 @@ class _QRViewExampleState extends State<QRViewExample> {
               height: MediaQuery.of(context).size.height / 2,
               child: Stack(
                 children: [
-                  _buildQrView(context, (id) async {
-                    // lấy mẵ sản phẩm call chổ này
-                    isLoading.value = true;
-                    var uriResponse = await http.get(
-                      Uri.parse(baseAPI + id),
-                    );
-                    isLoading.value = false;
-                  }),
+                  _buildQrView(
+                    context,
+                    (id) async {
+                      // lấy mẵ sản phẩm call chổ này
+
+                      if (id != idTmp) {
+                        idTmp = id;
+                        try {
+                          isLoading.value = true;
+
+                          http.Response uriResponse = await http.get(
+                            Uri.parse(baseAPI + id),
+                          );
+                          isLoading.value = false;
+                          print(uriResponse.body);
+                          dataModel.value =
+                              DataModel.fromJson(jsonDecode(uriResponse.body));
+                        } catch (e) {
+                          Fluttertoast.showToast(
+                              msg: "Không tìm thấy dữ liệu",
+                              toastLength: Toast.LENGTH_SHORT,
+                              gravity: ToastGravity.CENTER,
+                              backgroundColor: Colors.red,
+                              textColor: Colors.white,
+                              fontSize: 16.0);
+                        }
+                      }
+                    },
+                  ),
                   Positioned(
                     bottom: 0,
                     right: 0,
@@ -90,7 +115,8 @@ class _QRViewExampleState extends State<QRViewExample> {
                         IconButton(
                           onPressed: () async {
                             await controller?.toggleFlash();
-                            flash.value = await controller!.getFlashStatus() ?? false;
+                            flash.value =
+                                await controller!.getFlashStatus() ?? false;
                           },
                           icon: Obx(
                             () => flash.value
@@ -120,50 +146,58 @@ class _QRViewExampleState extends State<QRViewExample> {
               ),
             ),
             Expanded(
-                flex: 1,
-                child: Obx(
-                  () => isLoading.value
-                      ? Center(child: CircularProgressIndicator())
-                      : result == null
-                          ? Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  children: [
-                                    Item(
-                                      nameField: "Mã SP: ",
-                                    ),
-                                    Item(
-                                      nameField: "sku: ",
-                                    ),
-                                    Item(
-                                      nameField: "Số Lượng: ",
-                                    ),
-                                    Item(
-                                      nameField: "Kich thước: ",
-                                    ),
-                                    Item(
-                                      nameField: "Mã Đơn Hàng: ",
-                                    ),
-                                    Item(
-                                      nameField: "Chủng Loại: ",
-                                    ),
-                                    Item(
-                                      nameField: "Dạng Gia Công: ",
-                                    ),
-                                    Item(
-                                      nameField: "Dạng Gia Công: ",
-                                    ),
-                                    Item(
-                                      nameField: "Dạng Gia Công: ",
-                                    ),
-                                  ],
-                                ),
-                              ))
-                          : Center(
-                              child: Text('Scan a code'),
-                            ),
-                ))
+              flex: 1,
+              child: Obx(
+                () => isLoading.value
+                    ? Center(child: CircularProgressIndicator())
+                    : dataModel.value != null
+                        ? Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                  Item(
+                                    nameField: "Mã SP: ",
+                                    data: dataModel.value!.maSp!,
+                                  ),
+                                  Item(
+                                    nameField: "sku: ",
+                                    data: dataModel.value!.sku!,
+                                  ),
+                                  Item(
+                                    nameField: "Số Lượng: ",
+                                    data: dataModel.value!.soLuong.toString(),
+                                  ),
+                                  Item(
+                                    nameField: "Kich thước: ",
+                                    data:
+                                        "${dataModel.value!.dai.toString()}x${dataModel.value!.rong.toString()}",
+                                  ),
+                                  Item(
+                                    nameField: "Mã Đơn Hàng: ",
+                                    data: dataModel.value!.maDh.toString(),
+                                  ),
+                                  Item(
+                                    nameField: "Chủng Loại: ",
+                                    data: dataModel.value!.chungLoaiKinh
+                                        .toString(),
+                                  ),
+                                  Item(
+                                    nameField: "Dạng Gia Công: ",
+                                    data:
+                                        dataModel.value!.dangGiaCong.toString(),
+                                  ),
+                                  Item(
+                                      nameField: "Ngày Đặt Hàng: ",
+                                      data: dataModel.value!.ngayDatHang!),
+                                ],
+                              ),
+                            ))
+                        : Center(
+                            child: Text('Scan a code'),
+                          ),
+              ),
+            )
           ],
         ),
       ),
@@ -171,8 +205,10 @@ class _QRViewExampleState extends State<QRViewExample> {
   }
 
   Widget _buildQrView(BuildContext context, Function(String) callApi) {
-    var scanArea =
-        (MediaQuery.of(context).size.width < 400 || MediaQuery.of(context).size.height < 400) ? 150.0 : 300.0;
+    var scanArea = (MediaQuery.of(context).size.width < 400 ||
+            MediaQuery.of(context).size.height < 400)
+        ? 150.0
+        : 300.0;
 
     void _onQRViewCreated(QRViewController controller) {
       setState(() {
@@ -189,7 +225,11 @@ class _QRViewExampleState extends State<QRViewExample> {
       key: qrKey,
       onQRViewCreated: _onQRViewCreated,
       overlay: QrScannerOverlayShape(
-          borderColor: Colors.red, borderRadius: 10, borderLength: 30, borderWidth: 10, cutOutSize: scanArea),
+          borderColor: Colors.red,
+          borderRadius: 10,
+          borderLength: 30,
+          borderWidth: 10,
+          cutOutSize: scanArea),
       onPermissionSet: (ctrl, p) => _onPermissionSet(context, ctrl, p),
     );
   }
@@ -272,7 +312,8 @@ class _QRViewExampleState extends State<QRViewExample> {
 
 class Item extends StatelessWidget {
   const Item({
-    this.data = "adsfas dfghjj jjjjjjjj jjjj jjjjj jjjj jjj jjjjj jjjjjjj jj jjjjjjj jj",
+    this.data =
+        "adsfas dfghjj jjjjjjjj jjjj jjjjj jjjj jjj jjjjj jjjjjjj jj jjjjjjj jj",
     required this.nameField,
     Key? key,
   }) : super(key: key);
